@@ -1,0 +1,12 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+.idea/
+.vscode/
+*.iml
+.env
+.env.*
+!.env.example
+guide.txt
+lab13-guide.txt
+evidencias/*
+!evidencias/lab13-base-clean-test.txt
