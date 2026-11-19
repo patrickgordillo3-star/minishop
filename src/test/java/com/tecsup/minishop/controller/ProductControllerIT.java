@@ -1,4 +1,99 @@
 package com.tecsup.minishop.controller;
-import com.fasterxml.jackson.databind.ObjectMapper; import com.tecsup.minishop.model.Product; import com.tecsup.minishop.repository.ProductRepository; import org.junit.jupiter.api.*; import org.springframework.beans.factory.annotation.Autowired; import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc; import org.springframework.boot.test.context.SpringBootTest; import org.springframework.http.MediaType; import org.springframework.test.context.ActiveProfiles; import org.springframework.test.web.servlet.MockMvc; import static org.hamcrest.Matchers.hasSize; import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*; import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-@SpringBootTest @AutoConfigureMockMvc @ActiveProfiles("test") class ProductControllerIT { @Autowired MockMvc mockMvc; @Autowired ProductRepository productRepository; @Autowired ObjectMapper objectMapper; @BeforeEach void setUp(){productRepository.deleteAll();} @Test void shouldCreateProductAndReturn201() throws Exception {Product p=Product.builder().name("Webcam Logitech").price(250.0).stock(20).build(); mockMvc.perform(post("/api/products").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(p))).andExpect(status().isCreated()).andExpect(jsonPath("$.id").isNotEmpty()).andExpect(jsonPath("$.name").value("Webcam Logitech")).andExpect(jsonPath("$.price").value(250.0)).andExpect(jsonPath("$.stock").value(20));} @Test void shouldReturnAllProducts() throws Exception {productRepository.save(Product.builder().name("Disco SSD").price(180.0).stock(10).build()); productRepository.save(Product.builder().name("RAM 16GB").price(120.0).stock(8).build()); mockMvc.perform(get("/api/products")).andExpect(status().isOk()).andExpect(jsonPath("$",hasSize(2))).andExpect(jsonPath("$[0].name").value("Disco SSD")).andExpect(jsonPath("$[1].name").value("RAM 16GB"));} @Test void shouldReturnProductById() throws Exception {Product saved=productRepository.save(Product.builder().name("Impresora HP").price(350.0).stock(4).build()); mockMvc.perform(get("/api/products/"+saved.getId())).andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Impresora HP")).andExpect(jsonPath("$.price").value(350.0));} @Test void shouldReturn500WhenProductNotFound() throws Exception {mockMvc.perform(get("/api/products/9999")).andExpect(status().is5xxServerError());}}
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tecsup.minishop.dto.ProductCreateRequest;
+import com.tecsup.minishop.model.Product;
+import com.tecsup.minishop.repository.ProductRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+class ProductControllerIT {
+    @Autowired
+    MockMvc mockMvc;
+
+    @Autowired
+    ProductRepository productRepository;
+
+    @Autowired
+    ObjectMapper objectMapper;
+
+    @BeforeEach
+    void setUp() {
+        productRepository.deleteAll();
+    }
+
+    @Test
+    void shouldCreateProductFromDtoAndReturn201() throws Exception {
+        ProductCreateRequest request = new ProductCreateRequest("Webcam Logitech", 250.0, 20);
+
+        mockMvc.perform(post("/api/products")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNotEmpty())
+                .andExpect(jsonPath("$.name").value("Webcam Logitech"))
+                .andExpect(jsonPath("$.price").value(250.0))
+                .andExpect(jsonPath("$.stock").value(20));
+    }
+
+    @Test
+    void shouldIgnoreClientProvidedIdWhenCreatingProduct() throws Exception {
+        String requestWithInjectedId = """
+                {"id":9999,"name":"Producto seguro","price":125.0,"stock":7}
+                """;
+
+        mockMvc.perform(post("/api/products")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestWithInjectedId))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNotEmpty())
+                .andExpect(jsonPath("$.id").value(org.hamcrest.Matchers.not(9999)))
+                .andExpect(jsonPath("$.name").value("Producto seguro"))
+                .andExpect(jsonPath("$.price").value(125.0))
+                .andExpect(jsonPath("$.stock").value(7));
+    }
+
+    @Test
+    void shouldReturnAllProducts() throws Exception {
+        productRepository.save(Product.builder().name("Disco SSD").price(180.0).stock(10).build());
+        productRepository.save(Product.builder().name("RAM 16GB").price(120.0).stock(8).build());
+
+        mockMvc.perform(get("/api/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].name").value("Disco SSD"))
+                .andExpect(jsonPath("$[1].name").value("RAM 16GB"));
+    }
+
+    @Test
+    void shouldReturnProductById() throws Exception {
+        Product saved = productRepository.save(
+                Product.builder().name("Impresora HP").price(350.0).stock(4).build());
+
+        mockMvc.perform(get("/api/products/" + saved.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Impresora HP"))
+                .andExpect(jsonPath("$.price").value(350.0));
+    }
+
+    @Test
+    void shouldReturn500WhenProductNotFound() throws Exception {
+        mockMvc.perform(get("/api/products/9999"))
+                .andExpect(status().is5xxServerError());
+    }
+}
